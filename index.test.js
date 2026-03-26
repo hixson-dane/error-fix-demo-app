@@ -11,24 +11,21 @@ describe('GET /', () => {
 });
 
 describe('GET /users/:id', () => {
-  // These tests check surface-level response properties.
-  // They pass even when the route throws a TypeError, because the global
-  // error handler still returns a JSON body — the assertions are too loose
-  // to catch the underlying runtime error.
-
-  it('returns a JSON response', async () => {
+  it('returns 200 with user data for a valid user id', async () => {
     const res = await request(app).get('/users/1');
-    expect(res.headers['content-type']).toMatch(/json/);
-    expect(res.body).toBeDefined();
+    expect(res.statusCode).toBe(200);
+    expect(res.body.id).toBe(1);
+    expect(res.body.name).toBe('Alice');
   });
 
-  it('does not return a 404', async () => {
-    const res = await request(app).get('/users/1');
-    expect(res.statusCode).not.toBe(404);
+  it('returns 404 for a user id that does not exist', async () => {
+    const res = await request(app).get('/users/999');
+    expect(res.statusCode).toBe(404);
+    expect(res.body.error).toBe('User not found');
   });
 
-  it('response body contains at least one key', async () => {
+  it('does not return a 500 error', async () => {
     const res = await request(app).get('/users/1');
-    expect(Object.keys(res.body).length).toBeGreaterThan(0);
+    expect(res.statusCode).not.toBe(500);
   });
 });
