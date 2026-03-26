@@ -9,12 +9,18 @@ app.get('/', (req, res) => {
   res.json({ status: 'ok', message: 'API is running' });
 });
 
-// Route that causes a runtime error (TypeError) so a stack trace can be gathered
+const users = [
+  { id: 1, name: 'Alice', email: 'alice@example.com' },
+  { id: 2, name: 'Bob', email: 'bob@example.com' },
+  { id: 3, name: 'Carol', email: 'carol@example.com' },
+];
+
 app.get('/users/:id', (req, res, next) => {
   try {
-    const users = undefined;
-    // This line will throw: TypeError: Cannot read properties of undefined (reading 'find')
     const user = users.find((u) => u.id === parseInt(req.params.id));
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
     res.json(user);
   } catch (err) {
     next(err);
