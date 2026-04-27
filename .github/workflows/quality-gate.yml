@@ -1,0 +1,77 @@
+name: Quality Gate
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: quality
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+          cache: 'npm'
+
+      - name: Install dependencies
+        id: install
+        run: npm ci
+
+      - name: Run lint
+        # Run only if a lint script is defined; skip gracefully otherwise
+        run: |
+          if node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts.lint ? 0 : 1)" 2>/dev/null; then
+            npm run lint
+          else
+            echo "No lint script found — skipping."
+          fi
+
+      - name: Run tests
+        id: tests
+        run: |
+          if node -e "const p=require('./package.json'); process.exit(p.scripts && p.scripts.test ? 0 : 1)" 2>/dev/null; then
+            set -o pipefail
+            npm test -- --ci --reporters=default 2>&1 | tee /tmp/test-output.txt
+          else
+            echo "No test script found — skipping."
+          fi
+
+      - name: Write quality summary
+        if: always()
+        run: |
+          echo "## Quality Gate Summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Step | Result |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ---- | ------ |" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${{ steps.install.outcome }}" = "success" ]; then
+            echo "| Install (npm ci) | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| Install (npm ci) | ❌ |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ -f /tmp/test-output.txt ]; then
+            if [ "${{ steps.tests.outcome }}" = "success" ]; then
+              echo "| Tests | ✅ |" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "| Tests | ❌ See logs for details |" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "<details><summary>Test output</summary>" >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            cat /tmp/test-output.txt >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+            echo "</details>" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "| Tests | ⏭️ skipped |" >> "$GITHUB_STEP_SUMMARY"
+          fi
